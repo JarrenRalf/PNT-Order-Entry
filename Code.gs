@@ -4,7 +4,7 @@
  * 
  * @param {Event Object} e : The event object
  */
-function onEdit(e)
+function installedOnEdit(e)
 { 
   const range = e.range;
   const col = range.columnStart;
@@ -23,6 +23,8 @@ function onEdit(e)
       search_Customer(spreadsheet, sheet);
     else if (row == 2 && col == 2) // Customer Selection
       customerSelection(range, spreadsheet);
+    else if (row == 1 && col == 2) // Price Selection
+      priceSelection(range, sheet, spreadsheet);
     else if (row > 4 && col == 8) // Possibly deleting items from order
       deleteItemsFromOrder(sheet, range, range.getValue(), row, isSingleRow, isSingleColumn, spreadsheet);
   }
@@ -51,7 +53,7 @@ function onChange(e)
  */
 function onOpen()
 {
-  SpreadsheetApp.getUi().createMenu('Export').addItem('Complete', 'completeOrder').addToUi();
+  SpreadsheetApp.getUi().createMenu('Export').addItem('Complete', 'completeOrder').addItem('Clear', 'clearExport').addToUi();
 }
 
 /**
@@ -91,7 +93,7 @@ function addSelectedItemsToOrder()
   else
     SpreadsheetApp.getUi().alert('Please select an item from the list.');
 
-  sheet.getRange(2, 7).setValue((new Date().getTime() - startTime)/1000 + " seconds");
+  sheet.getRange(1, 7).setValue((new Date().getTime() - startTime)/1000 + " seconds");
 }
 
 /**
@@ -127,6 +129,187 @@ function checkForOrderSubmission(range)
   range.offset(0, 1).setValue((new Date().getTime() - startTime)/1000 + " seconds").offset(2, -5).setValue(startTime); // Place the timestamp in one of the hidden cells
   SpreadsheetApp.flush(); // Force the change on the spreadsheet first
   SpreadsheetApp.getUi().alert((range.isChecked()) ? 'Your order has been submitted.\n\nThank You!' : 'You have cancelled your order.\n\nYou may make changes and re-submit by selecting the checkbox again.')
+}
+
+/**
+ * This function clears the export sheet and then sends Adrian a courtesy email letting him know that the import template for Adagio OrderEntry has changed.
+ * 
+ * @author Jarren Ralf
+ */
+function clearExport()
+{
+  const spreadsheet = SpreadsheetApp.getActive();
+  const exportSheet = spreadsheet.getActiveSheet();
+
+  try
+  {
+    if (exportSheet.getSheetName() !== 'Export')
+    {
+      spreadsheet.getSheetByName('Export').activate();
+      Browser.msgBox('You must be on the Export sheet in order to clear it.')
+    }
+    else
+    {
+      exportSheet.clear();
+      MailApp.sendEmail('adrian@pacificnetandtwine.com', 'The Template for Importing into OE has changed!', 'Remember to change the import template from LodgeImport to ShopifyImport next time you use it.') 
+    }
+  }
+  catch (e)
+  {
+    var error = e['stack'];
+    sendErrorEmail(error);
+  }
+}
+
+/**
+ * 
+ */
+function completeOrder()
+{
+  try
+  {
+    const searchSheet = SpreadsheetApp.getActiveSheet();
+
+    if (searchSheet.getSheetName() !== 'Item Search')
+    {
+      spreadsheet.getSheetByName('Item Search').activate();
+      Browser.msgBox('Please return to the Dashboard to run this function.')
+    }
+    else
+    {
+      var exportData_WithDiscountedPrices = [];
+      const numRows = Math.max(getLastRowSpecial(searchSheet.getSheetValues(4, 4, searchSheet.getMaxRows() - 3, 1)), 
+                               getLastRowSpecial(searchSheet.getSheetValues(4, 8, searchSheet.getMaxRows() - 3, 1)), 
+                               getLastRowSpecial(searchSheet.getSheetValues(4, 9, searchSheet.getMaxRows() - 3, 1)));
+      const numCols = 7;
+      const orderRange = searchSheet.getRange(4, 3, numRows, numCols);
+
+      orderRange.getValues().map(item => {
+        if (item[0] === 'H')
+          exportData_WithDiscountedPrices.push(['H', item[1], item[2], item[3]])
+        else if (item[0] === 'I')
+          exportData_WithDiscountedPrices.push(['I', item[1], '', ''])
+        else if (item[0] === 'D')
+        {
+          item[1] = item[1].toString().trim().toUpperCase(); // Make the SKU uppercase
+
+          if (isNotBlank(item[1])) // SKU is not blank
+            if (isNotBlank(item[3])) // Order quantity is not blank
+              if (Number(item[3]).toString() !== 'NaN') // Order number is a valid number
+                exportData_WithDiscountedPrices.push(['D', item[1], item[2], item[3]])
+              else // Order quantity is not a valid number
+                exportData_WithDiscountedPrices.push(
+                  ['D', item[1], item[2], 0], 
+                  ['C', 'Invalid order QTY: "' + item[3] + '" for above item, therefore it was replaced with 0', '', '']
+                )
+            else // The order quantity is blank (while SKU is not)
+              exportData_WithDiscountedPrices.push(
+                ['D', item[1], item[2], 0],
+                ['C', 'Order quantity was blank for the above item, therefore it was replaced with 0', '', '']
+              )
+          else // The SKU is blank
+            if (isNotBlank(item[3])) // Order quantity is not blank
+              if (Number(item[3]).toString() !== 'NaN') // Order number is a valid number
+                exportData_WithDiscountedPrices.push(
+                  ['D', 'MISCITEM', 0, item[3]], 
+                  ...('Description: ' + item[5] + ' - ' + item[4]).toString().match(/.{1,75}/g).map(c => ['C', c, '', ''])
+                )
+              else // Order quantity is not a valid number
+                exportData_WithDiscountedPrices.push(
+                  ['D', 'MISCITEM', 0, 0], 
+                  ['C', 'Invalid order QTY: "' + item[3] + '" for above item, therefore it was replaced with 0', '', ''], 
+                  ...('Description: ' + item[5] + ' - ' + item[4]).toString().match(/.{1,75}/g).map(c => ['C', c, '', ''])
+                )
+            else if (isNotBlank(item[5]))// Description is not blank (but SKU and quantity are)
+                exportData_WithDiscountedPrices.push(
+                  ['D', 'MISCITEM', 0, 0], 
+                  ['C', 'Order quantity was blank for the above item, therefore it was replaced with 0', '', ''],
+                  ...('Description: ' + item[5] + ' - ' + item[4]).toString().match(/.{1,75}/g).map(c => ['C', c, '', ''])
+                )
+
+          if (isNotBlank(item[6])) // There are notes for the current line
+            exportData_WithDiscountedPrices.push(...('Notes: ' + item[6]).match(/.{1,75}/g).map(c => ['C', c, '', '']))
+        }
+        else // There was no line indicator
+        {
+          item[1] = item[1].toString().trim().toUpperCase(); // Make the SKU uppercase
+
+          if (isNotBlank(item[1])) // SKU is not blank
+          {
+            if (isNotBlank(item[3])) // Order quantity is not blank
+              if (Number(item[3]).toString() !== 'NaN') // Order number is a valid number
+                exportData_WithDiscountedPrices.push(['D', item[1], item[2], item[3]])
+              else // Order quantity is not a valid number
+                exportData_WithDiscountedPrices.push(
+                  ['D', item[1], item[2], 0], 
+                  ['C', 'Invalid order QTY: "' + item[3] + '" for above item, therefore it was replaced with 0', '', '']
+                )
+            else // The order quantity is blank (while SKU is not)
+              exportData_WithDiscountedPrices.push(
+                ['D', item[1], item[2], 0],
+                ['C', 'Order quantity was blank for the above item, therefore it was replaced with 0', '', '']
+              )
+          }
+          else // The SKU is blank
+          {
+            if (isNotBlank(item[3])) // Order quantity is not blank
+              if (Number(item[3]).toString() !== 'NaN') // Order number is a valid number
+                exportData_WithDiscountedPrices.push(
+                  ['D', 'MISCITEM', 0, item[3]], 
+                  ...('Description: ' + item[5] + ' - ' + item[4]).toString().match(/.{1,75}/g).map(c => ['C', c, '', ''])
+                )
+              else // Order quantity is not a valid number
+                exportData_WithDiscountedPrices.push(
+                  ['D', 'MISCITEM', 0, 0], 
+                  ['C', 'Invalid order QTY: "' + item[3] + '" for above item, therefore it was replaced with 0', '', ''], 
+                  ...('Description: ' + item[5] + ' - ' + item[4]).toString().match(/.{1,75}/g).map(c => ['C', c, '', ''])
+                )
+            else if (isNotBlank(item[5])) // Description is not blank (but SKU and quantity are)
+              exportData_WithDiscountedPrices.push(
+                ['D', 'MISCITEM', 0, 0], 
+                ['C', 'Order quantity was blank for the above item, therefore it was replaced with 0', '', ''],
+                ...('Description: ' + item[5] + ' - ' + item[4]).toString().match(/.{1,75}/g).map(c => ['C', c, '', ''])
+              )
+          }
+
+          if (isNotBlank(item[6])) // There are notes for the current line
+            exportData_WithDiscountedPrices.push(...('Notes: ' + item[6]).match(/.{1,75}/g).map(c => ['C', c, '', '']))
+        }
+      })
+
+      orderRange.offset(1, 0, numRows - 1, numCols).clearContent() // Customer Order
+        .offset(-4, -1, 1, 1).setValue('')       // Pricing Selection
+        .offset( 1,  0).setValue('')             // Customer Name
+        .offset( 0,  6).setValue('')             // PO Number
+        .offset(-1, -2).setValue('')             // Customer #
+        .offset( 1,  3).setValue('')             // Message Display
+        .offset(-1,  0).setValue('').activate(); // Customer Search
+      const exportSheet = SpreadsheetApp.getActive().getSheetByName('Export');
+      const lastRow = exportSheet.getLastRow() + 1;
+      const ranges = [[],[],[]];
+      const backgroundColours = [
+        '#c9daf8', // Make the header rows blue
+        '#fcefe1', // Make the comment rows orange
+        '#e0d5fd'  // Make the instruction comment rows purple
+      ];
+
+      exportData_WithDiscountedPrices.map((h, r) => 
+        h = (h[0] !== 'H') ? (h[0] !== 'C') ? (h[0] !== 'I') ? false : 
+        ranges[2].push('A' + (r + lastRow) + ':D' + (r + lastRow)) : // Instruction comment rows purple
+        ranges[1].push('A' + (r + lastRow) + ':D' + (r + lastRow)) : // Comment rows orange
+        ranges[0].push('A' + (r + lastRow) + ':D' + (r + lastRow))   // Header rows blue
+      )
+
+      ranges.map((rngs, r) => (rngs.length !== 0) ? exportSheet.getRangeList(rngs).setBackground(backgroundColours[r]) : false); // Set the appropriate background colours
+      exportSheet.getRange(lastRow, 1, exportData_WithDiscountedPrices.length, 4).setNumberFormat('@').setValues(exportData_WithDiscountedPrices)
+        .offset(-1*lastRow + 1, 0, exportSheet.getLastRow(), 4).activate();
+    }
+  }
+  catch (e)
+  {
+    var error = e['stack'];
+    throw new Error(error);
+  }
 }
 
 /**
@@ -201,7 +384,7 @@ function deleteItemsFromOrder(sheet, range, value, row, isSingleRow, isSingleCol
   else
     spreadsheet.toast('Nothing Deleted.')
 
-  sheet.getRange(2, 7).setValue((new Date().getTime() - startTime)/1000 + " seconds");
+  sheet.getRange(1, 7).setValue((new Date().getTime() - startTime)/1000 + " seconds");
 }
 
 /**
@@ -263,6 +446,66 @@ function isNotBlank(str)
 }
 
 /**
+ * This function
+ * 
+ * @author Jarren Ralf
+ */
+function priceSelection(range, sheet, spreadsheet)
+{
+  const selectedPricing = range.getValue();
+
+  if (isNotBlank(selectedPricing))
+  {
+    spreadsheet.toast('Computing price change...')
+
+    switch (selectedPricing)
+    {
+      case 'Retail Pricing':
+        var price = 1;
+        break;
+      case 'Guide Pricing':
+        var price = 2;
+        break;
+      case 'Lodge Pricing':
+        var price = 3;
+        break;
+      case 'Wholesale Pricing':
+        var price = 4;
+        break;
+    }
+
+    const discountSheet = SpreadsheetApp.openById('1gXQ7uKEYPtyvFGZVmlcbaY6n6QicPBhnCBxk-xqwcFs').getSheetByName('Discount Percentages')
+    const discounts = discountSheet.getSheetValues(2, 11, discountSheet.getLastRow() - 1, 5);
+    const BASE_PRICE = 1;
+    var itemPricing;
+
+    const numRows = getLastRowSpecial(sheet.getSheetValues(5, 4, sheet.getMaxRows(), 1));
+
+    if (numRows > 0)
+    {
+      const itemRange = sheet.getRange(5, 4, getLastRowSpecial(sheet.getSheetValues(5, 4, sheet.getMaxRows(), 1)), 2);
+
+      const order = itemRange.getValues().map(item => {
+        itemPricing = discounts.find(sku => sku[0].split(' - ').pop().toString().toUpperCase() === item[0]); // Find the item pricing on the discount sheet
+
+        if (itemPricing != undefined && itemPricing[BASE_PRICE] != 0) // SKU is assumed to be valid
+          item[1] = (price !== 1) ? (itemPricing[BASE_PRICE]*(100 - itemPricing[price])/100).toFixed(2) : itemPricing[price];
+
+        return item
+      }) 
+
+      itemRange.setValues(order);
+      spreadsheet.toast('Price change complete.')
+    }
+    else
+    {
+      range.offset(0, -1).activate();
+      spreadsheet.toast('Please add some items to the order.')
+    }
+  }
+}
+
+/**
  * This function process the imported data.
  * 
  * @param {Event Object} : The event object on an spreadsheet edit.
@@ -274,7 +517,7 @@ function processImportedData(e)
   {
     var spreadsheet = e.source;
     var sheets = spreadsheet.getSheets();
-    var info, numRows = 0, numCols = 1, maxRow = 2, maxCol = 3, isCustomerData = 4;
+    var info, numRows = 0, numCols = 1, maxRow = 2, maxCol = 3, isCustomerData = 4, fileName;
 
     for (var sheet = sheets.length - 1; sheet >= 0; sheet--) // Loop through all of the sheets in this spreadsheet and find the new one
     {
@@ -285,8 +528,10 @@ function processImportedData(e)
           sheets[sheet].getLastColumn(),
           sheets[sheet].getMaxRows(),
           sheets[sheet].getMaxColumns(),
-          sheets[sheet].getRange(1, 1).getValue().toString().includes('Cust #') // A characteristic of the customer data
+          (sheets[sheet].getLastColumn() != 0) ? sheets[sheet].getSheetValues(1, 1, 1, sheets[sheet].getLastColumn())[0].includes('Telephone') : false // A characteristic of the customer data
         ]
+
+        fileName = sheets[sheet].getSheetName()
       
         // A new sheet is imported by File -> Import -> Insert new sheet(s) - The left disjunct is for a csv and the right disjunct is for an excel file
         if ((info[maxRow] - info[numRows] === 2 && info[maxCol] - info[numCols] === 2) || 
@@ -298,20 +543,28 @@ function processImportedData(e)
           if (sheets[sheet].getSheetName().substring(0, 7) !== "Copy Of")
           {
             if (info[isCustomerData])
-            {
-              updateCustomerList(info[numRows], info[numCols], sheets[sheet], spreadsheet)
-              spreadsheet.deleteSheet(spreadsheet.getSheetByName('Customer List')) // Delete the old customer list
-              sheets[sheet].setName('Customer List').hideSheet().deleteRow(info[numRows]).deleteColumns(3, info[numCols] - 2);
-              sheets[sheet].sort(2).setFrozenRows(1);
-              sheets[0].getRange(1, 9).activate();
-              spreadsheet.toast('Customer List was updated.', 'Import Complete.')
-            }
+              updateCustomerList(info[numRows], info[numCols], sheets[sheet], sheets, spreadsheet);
             else // Assume it's a credit note from counter sales
             {
               const values = sheets[sheet].getSheetValues(1, 1, info[numRows], info[numCols])
-              Logger.log(values)
+              const custNum = values[2][24];
+              const poNum = values[9][23];
+              const customerSheet = spreadsheet.getSheetByName('Customer List');
+              var custName = customerSheet.getSheetValues(2, 1, customerSheet.getLastRow() - 1, 2).find(custNumber => custNumber[0] === custNum)
+              custName = (custName != undefined) ? custName[1] : '';
+              const items = values.filter(val => isNotBlank(val[16])) // Use the unit of measure column to remove unnecessary rows
+              items.pop()
+              items.pop()
+              items.pop()
+              const exportValues = items.map(item => ['D', item[3], item[18], (-1*Number(item[0])).toString(), item[16], item[5]]);
+              sheets[0].getRange(1, 2).setValue('')
+                .offset(0,  4).setValue(custNum)
+                .offset(1, -4).setValue('\'' + custName)
+                .offset(0,  6).setValue(poNum)
+                .offset(3, -5, sheets[0].getMaxRows() - 4, 7).clearContent()
+                .offset(0, 0, exportValues.length, 6).setNumberFormat('@').setValues(exportValues).activate();
               spreadsheet.deleteSheet(sheets[sheet]);
-              //spreadsheet.toast('Counter Sales Credit Note was successfully imported.', 'Import Complete.')
+              spreadsheet.toast('Counter Sales Credit Note was successfully imported.', 'Import Complete.')
             }
           }
           
@@ -321,10 +574,14 @@ function processImportedData(e)
     }
 
     // Try and find the file created and delete it
-    var file = DriveApp.getFilesByName("Book1.xlsx")
+    var file1 = DriveApp.getFilesByName("Book1.xlsx")
+    var file2 = DriveApp.getFilesByName(fileName + ".xlsx")
 
-    if (file.hasNext())
-      file.next().setTrashed(true)
+    if (file1.hasNext())
+      file1.next().setTrashed(true)
+
+    if (file2.hasNext())
+      file2.next().setTrashed(true)
   }
 }
 
@@ -428,13 +685,13 @@ function search(e, spreadsheet, sheet)
 
     if (numItems === 0) // No items were found
       sheet.getRange('A1').activate() // Move the user back to the seachbox
-        .offset(4, 0, sheet.getMaxRows() - 4).clearContent() // Clear content
-        .offset(-3, 6, 1, 1).setValue("No results found.\nPlease try again.");
+        .offset( 4, 0, sheet.getMaxRows() - 4).clearContent() // Clear content
+        .offset(-3, 8, 1, 1).setValue("No results found.\nPlease try again.");
     else
       sheet.getRange('A5').activate() // Move the user to the top of the search items
-        .offset(0, 0, sheet.getMaxRows() - 4).clearContent()
-        .offset(0, 0, numItems).setValues(output) 
-        .offset(-3, 7, 1, 1).setValue((numItems !== 1) ? numItems + " results found." : numItems + " result found.");
+        .offset( 0, 0, sheet.getMaxRows() - 4).clearContent()
+        .offset( 0, 0, numItems).setValues(output) 
+        .offset(-3, 8, 1, 1).setValue((numItems !== 1) ? numItems + " results found." : numItems + " result found.");
 
     spreadsheet.toast('Searching Complete.');
   }
@@ -444,19 +701,19 @@ function search(e, spreadsheet, sheet)
     const recentlyCreatedItemsSheet = spreadsheet.getSheetByName('Recently Created');
     const numItems = recentlyCreatedItemsSheet.getLastRow();
     sheet.getRange('A5').activate() // Move the user to the top of the search items
-      .offset(0, 0, sheet.getMaxRows() - 4).clearContent()
-      .offset(0, 0, numItems).setValues(recentlyCreatedItemsSheet.getSheetValues(1, 1, numItems, 1))
-      .offset(-3, 7, 1, 1).setValue("Items displayed in order of newest to oldest.")
+      .offset( 0, 0, sheet.getMaxRows() - 4).clearContent()
+      .offset( 0, 0, numItems).setValues(recentlyCreatedItemsSheet.getSheetValues(1, 1, numItems, 1))
+      .offset(-3, 8, 1, 1).setValue("Items displayed in order of newest to oldest.")
     spreadsheet.toast('PNT\'s most recently created items are being displayed.')
   }
   else
   {
     sheet.getRange(5, 1, sheet.getMaxRows() - 4).clearContent() // Clear content 
-      .offset(-3, 7, 1, 1).setValue("Invalid search.\nPlease try again.");
+      .offset(-3, 8, 1, 1).setValue("Invalid search.\nPlease try again.");
     spreadsheet.toast('Invalid Search.');
   }
 
-  sheet.getRange(2, 7).setValue((new Date().getTime() - startTime)/1000 + " seconds");
+  sheet.getRange(1, 7).setValue((new Date().getTime() - startTime)/1000 + " seconds");
 }
 
 /**
@@ -611,9 +868,13 @@ function search_Customer(spreadsheet, sheet)
 /**
  * This fucntion...
  */
-function updateCustomerList()
+function updateCustomerList(numRows, numCols, sheet, sheets, spreadsheet)
 {
-
+  spreadsheet.deleteSheet(spreadsheet.getSheetByName('Customer List')) // Delete the old customer list
+  sheet.setName('Customer List').hideSheet().deleteRow(numRows).deleteColumns(3, numCols - 2);
+  sheet.sort(2).setFrozenRows(1);
+  sheets[0].getRange(1, 9).activate();
+  spreadsheet.toast('Customer List was updated.', 'Import Complete.')
 }
 
 /**
