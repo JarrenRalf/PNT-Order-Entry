@@ -111,24 +111,9 @@ function allItems()
   sheet.getRange(1, 1).clearContent() // Clear the search box
     .offset(4, 0, sheet.getMaxRows() - 4).clearContent() // Clear the previous search
     .offset(0, 0, numItems).setValues(recentlyCreatedSheet.getSheetValues(1, 1, numItems, 1)) // Set the values
-    .offset(-3, 7, 1, 1).setValue("Items displayed in order of newest to oldest.") // Tell user items are sorted from newest to oldest
-    .offset(0, -1).setValue((new Date().getTime() - startTime)/1000 + " seconds"); // Function runtime
+    .offset(-3, 8, 1, 1).setValue("Items displayed in order of newest to oldest.") // Tell user items are sorted from newest to oldest
+    .offset(-1, -2).setValue((new Date().getTime() - startTime)/1000 + " seconds"); // Function runtime
   spreadsheet.toast('PNT\'s most recently created items are being displayed.');
-}
-
-/**
- * This function checks if the customer has checked or unchecked their submission button. In both cases, this will lead to the PNT Order Processor spreadsheet to send the appropriate 
- * emails to the customer and PNT employees.
- * 
- * @param {Range} range : The range of the checkbox.
- * @author Jarren Ralf
- */
-function checkForOrderSubmission(range)
-{
-  const startTime = new Date().getTime(); // Used for the function runtime
-  range.offset(0, 1).setValue((new Date().getTime() - startTime)/1000 + " seconds").offset(2, -5).setValue(startTime); // Place the timestamp in one of the hidden cells
-  SpreadsheetApp.flush(); // Force the change on the spreadsheet first
-  SpreadsheetApp.getUi().alert((range.isChecked()) ? 'Your order has been submitted.\n\nThank You!' : 'You have cancelled your order.\n\nYou may make changes and re-submit by selecting the checkbox again.')
 }
 
 /**
@@ -162,7 +147,9 @@ function clearExport()
 }
 
 /**
+ * This function places the current Order on the Export page for importing.
  * 
+ * @author Jarren Ralf
  */
 function completeOrder()
 {
@@ -313,8 +300,10 @@ function completeOrder()
 }
 
 /**
- * This function
+ * This function takes the selected customer name from the drop down and retreives the corresponding Customer number.
  * 
+ * @param {Range} range : The range of the data validation where the vendor name is selected.
+ * @param {Spreadsheet} : The active spreadsheet.
  * @author Jarren Ralf
  */
 function customerSelection(range, spreadsheet)
@@ -329,6 +318,7 @@ function customerSelection(range, spreadsheet)
   else
     range.offset(-1, 4).setValue('');
 }
+
 
 /**
  * This function handles the task of deleting items from the users order on the Item Search sheet. 
@@ -446,8 +436,11 @@ function isNotBlank(str)
 }
 
 /**
- * This function
+ * This function changes the pricing for the whole order based on the user's selection of pricing structure.
  * 
+ * @param   {Range}       range     : The range of the price selection.
+ * @param   {Sheet}       sheet     : The active sheet.
+ * @param {Spreadsheet} spreadsheet : The active spreadsheet.
  * @author Jarren Ralf
  */
 function priceSelection(range, sheet, spreadsheet)
@@ -866,7 +859,38 @@ function search_Customer(spreadsheet, sheet)
 }
 
 /**
- * This fucntion...
+ * This function updates all of the items daily.
+ * 
+ * @author Jarren Ralf
+ */
+function updateItems()
+{
+  var d,  itemList = [];
+  const spreadsheet = SpreadsheetApp.getActive();
+  const sortedItems = Utilities.parseCsv(DriveApp.getFilesByName("inventory.csv").next().getBlob().getDataAsString()).map(item => {
+    itemList.push([item[1]]);
+    d = item[6].split('.');                           // Split the date at the "."
+    item[6] = new Date(d[2],d[1] - 1,d[0]).getTime(); // Convert the date sting to a striong object for sorting purposes
+  
+    return [item[1], item[6]];
+  }).sort(sortByCreatedDate).sort(sortByCreatedDate).map(descrip => [descrip[0]])
+
+  // Remove the headers
+  itemList.shift();
+  sortedItems.shift();
+  const numItems = itemList.length;
+  spreadsheet.getSheetByName('Item List').getRange(1, 1, numItems).setValues(itemList);
+  spreadsheet.getSheetByName('Recently Created').getRange(1, 1, numItems).setValues(sortedItems);
+}
+
+/**
+ * This function manages the imported list of Customer names and numbers and puts that information on the hidden Customer List sheet.
+ * 
+ * @param   {Number}     numRows    : The number of rows on the imported Customer sheet
+ * @param   {Number}     numCols    : The number of columns on the imported Customer sheet
+ * @param   {Sheet}       sheet     : The imported sheet (The new Customer list)
+ * @param   {Sheet[]}     sheets    : All of the sheets of the spreadsheet
+ * @param {Spreadsheet} spreadsheet : The active spreadsheet
  */
 function updateCustomerList(numRows, numCols, sheet, sheets, spreadsheet)
 {
