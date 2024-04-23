@@ -319,6 +319,15 @@ function customerSelection(range, spreadsheet)
     range.offset(-1, 4).setValue('');
 }
 
+/**
+ * This function creates the trigger for updating the items daily.
+ * 
+ * @author Jarren Ralf
+ */
+function createTrigger()
+{
+  ScriptApp.newTrigger('updateItems').timeBased().everyDays(1).atHour(23).create();
+}
 
 /**
  * This function handles the task of deleting items from the users order on the Item Search sheet. 
