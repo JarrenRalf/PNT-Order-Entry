@@ -15,7 +15,7 @@ function installedOnEdit(e)
   const spreadsheet = e.source;
   const sheet = spreadsheet.getActiveSheet();
 
-  if (isSingleColumn)
+  if (isSingleColumn && sheet.getSheetName() === 'Item Search')
   {
     if (row == 1 && col == 1 && (rowEnd == null || rowEnd == 2 || isSingleRow)) // Item Search
       search(e, spreadsheet, sheet, false);
