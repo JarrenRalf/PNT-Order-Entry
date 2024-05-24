@@ -136,10 +136,7 @@ function clearExport()
       Browser.msgBox('You must be on the Export sheet in order to clear it.')
     }
     else
-    {
-      exportSheet.clear();
-      MailApp.sendEmail('adrian@pacificnetandtwine.com', 'The Template for Importing into OE has changed!', 'Remember to change the import template from LodgeImport to ShopifyImport next time you use it.') 
-    }
+      exportSheet.clear(); 
   }
   catch (e)
   {
