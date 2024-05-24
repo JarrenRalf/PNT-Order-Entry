@@ -608,13 +608,10 @@ function search(e, spreadsheet, sheet, isMultipleItemSearch)
     const values = e.range.getValues().filter(blank => isNotBlank(blank[0]))
     sheet.getRange(1, 1, 2, 1).clearContent(); // Clear the search bar
 
-    Logger.log(values)
-
     if (values.length !== 0) // Don't run function if every value is blank, probably means the user pressed the delete key on a large selection
     {
       const inventorySheet = spreadsheet.getSheetByName('Item List');
       const data = inventorySheet.getSheetValues(1, 1, inventorySheet.getLastRow(), 1);
-      Logger.log(data)
       var someSKUsNotFound = false, skus;
 
       if (values[0][0].toString().includes(' - ')) // Strip the sku from the first part of the google description
@@ -676,9 +673,7 @@ function search(e, spreadsheet, sheet, isMultipleItemSearch)
         const numSkusNotFound = skusNotFound.length;
         const items = [].concat.apply([], [skusNotFound, skusFound]); // Concatenate all of the item values as a 2-D array
         const numItems = items.length
-
         const colours = [].concat.apply([], [new Array(numSkusNotFound).fill(['#ffe599']), new Array(numSkusFound).fill(['white'])]); // Concatenate all of the item values as a 2-D array
-        Logger.log(items)
 
         if (numItems === 0) // No items were found
           sheet.getRange('A1').activate() // Move the user back to the seachbox
