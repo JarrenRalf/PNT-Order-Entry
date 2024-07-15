@@ -764,8 +764,8 @@ function search(e, spreadsheet, sheet, isMultipleItemSearch)
       spreadsheet.toast('Searching...')
 
       const numSearches = searches.length; // The number searches
-      var numSearchWords;
       var isBarcodeScanned = false;
+      var numSearchWords;
 
       if (searchesOrNot.length === 1) // The word 'not' WASN'T found in the string
       {
@@ -1080,6 +1080,34 @@ function sortByCreatedDate(a, b)
 }
 
 /**
+ * This function sorts the UPC Codes in numerical order.
+ * 
+ * @author Jarren Ralf
+ */
+function sortUPCsNumerically(a, b)
+{
+  return parseInt(a[0]) - parseInt(b[0]);
+}
+
+/**
+ * This function manages the imported list of Customer names and numbers and puts that information on the hidden Customer List sheet.
+ * 
+ * @param   {Number}     numRows    : The number of rows on the imported Customer sheet
+ * @param   {Number}     numCols    : The number of columns on the imported Customer sheet
+ * @param   {Sheet}       sheet     : The imported sheet (The new Customer list)
+ * @param   {Sheet[]}     sheets    : All of the sheets of the spreadsheet
+ * @param {Spreadsheet} spreadsheet : The active spreadsheet
+ */
+function updateCustomerList(numRows, numCols, sheet, sheets, spreadsheet)
+{
+  spreadsheet.deleteSheet(spreadsheet.getSheetByName('Customer List')) // Delete the old customer list
+  sheet.setName('Customer List').hideSheet().deleteRow(numRows).deleteColumns(3, numCols - 2);
+  sheet.sort(2).setFrozenRows(1);
+  sheets[0].getRange(1, 9).activate();
+  spreadsheet.toast('Customer List was updated.', 'Import Complete.')
+}
+
+/**
  * This function updates all of the items daily.
  * 
  * @author Jarren Ralf
@@ -1102,24 +1130,6 @@ function updateItems()
   const numItems = itemList.length;
   spreadsheet.getSheetByName('Item List').getRange(1, 1, numItems).setValues(itemList);
   spreadsheet.getSheetByName('Recently Created').getRange(1, 1, numItems).setValues(sortedItems);
-}
-
-/**
- * This function manages the imported list of Customer names and numbers and puts that information on the hidden Customer List sheet.
- * 
- * @param   {Number}     numRows    : The number of rows on the imported Customer sheet
- * @param   {Number}     numCols    : The number of columns on the imported Customer sheet
- * @param   {Sheet}       sheet     : The imported sheet (The new Customer list)
- * @param   {Sheet[]}     sheets    : All of the sheets of the spreadsheet
- * @param {Spreadsheet} spreadsheet : The active spreadsheet
- */
-function updateCustomerList(numRows, numCols, sheet, sheets, spreadsheet)
-{
-  spreadsheet.deleteSheet(spreadsheet.getSheetByName('Customer List')) // Delete the old customer list
-  sheet.setName('Customer List').hideSheet().deleteRow(numRows).deleteColumns(3, numCols - 2);
-  sheet.sort(2).setFrozenRows(1);
-  sheets[0].getRange(1, 9).activate();
-  spreadsheet.toast('Customer List was updated.', 'Import Complete.')
 }
 
 /**
