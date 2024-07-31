@@ -326,14 +326,17 @@ function customerSelection(range, spreadsheet)
 }
 
 /**
- * This function creates the trigger for updating the items daily.
+ * This function creates the trigger for updating the items daily and for the installed onEdit and Change triggers.
  * 
  * @author Jarren Ralf
  */
 function createTrigger()
 {
+  const ss = SpreadsheetApp.getActive();
   ScriptApp.newTrigger('updateItems').timeBased().everyDays(1).atHour(23).create();
   ScriptApp.newTrigger('updateUPCs').timeBased().everyDays(1).atHour(23).create();
+  ScriptApp.newTrigger('onChange').forSpreadsheet(ss).onChange().create();
+  ScriptApp.newTrigger('installedOnEdit').forSpreadsheet(ss).onChange().create();
 }
 
 /**
@@ -551,6 +554,45 @@ function priceSelection(range, sheet, spreadsheet)
 }
 
 /**
+ * This function checks processes the recently created tab and converts the information into a new order that can be imported into Adagio. It is assumed to be a countersales credit note in this case.
+ * 
+ * @param {Number} numRows : The number of rows from the imported excel file.
+ * @param {Number} numCols : The number of columns from the imported excel file.
+ * @param {Sheet} newSheet : The new sheet that that was just created on import that contains the data from the excel file.
+ * @param {Sheet} itemSearchSheet : The item search search which is used to create new orders.
+ * @param {Spreadsheet} spreadsheet : The active spreadsheet.
+ * @author Jarren Ralf  
+ */
+function processImportedCreditNote(numRows, numCols, newSheet, itemSearchSheet, spreadsheet)
+{
+  const values = newSheet.getSheetValues(1, 1, numRows, numCols)
+  const custNum = values[2][24];
+  const poNum = values[9][23];
+
+  Logger.log('custNum: ' + custNum)
+  Logger.log('poNum: ' + poNum)
+  const customerSheet = spreadsheet.getSheetByName('Customer List');
+  var custName = customerSheet.getSheetValues(2, 1, customerSheet.getLastRow() - 1, 2).find(custNumber => custNumber[0] === custNum)
+  Logger.log('custName: ' + custName)
+  custName = (custName != undefined) ? custName[1] : '';
+  const items = values.filter(val => isNotBlank(val[16])) // Use the unit of measure column to remove unnecessary rows
+  items.pop()
+  items.pop()
+  items.pop()
+  Logger.log('items: ' + items)
+  const exportValues = items.map(item => ['D', item[3], item[18], (-1*Number(item[0])).toString(), item[16], item[5]]);
+  Logger.log('exportValues: ' + exportValues)
+  itemSearchSheet.getRange(1, 2).setValue('')
+    .offset(0,  4).setValue(custNum)
+    .offset(1, -4).setValue('\'' + custName)   
+    .offset(0,  6).setValue(poNum)
+    .offset(3, -5, itemSearchSheet.getMaxRows() - 4, 7).clearContent()
+    .offset(0, 0, exportValues.length, 6).setNumberFormat('@').setValues(exportValues).activate();
+  spreadsheet.deleteSheet(newSheet);
+  spreadsheet.toast('Counter Sales Credit Note was successfully imported.', 'Import Complete.')
+}
+
+/**
  * This function process the imported data.
  * 
  * @param {Event Object} : The event object on an spreadsheet edit.
@@ -589,28 +631,10 @@ function processImportedData(e)
           {
             if (info[isCustomerData])
               updateCustomerList(info[numRows], info[numCols], sheets[sheet], sheets, spreadsheet);
-            else // Assume it's a credit note from counter sales
-            {
-              const values = sheets[sheet].getSheetValues(1, 1, info[numRows], info[numCols])
-              const custNum = values[2][24];
-              const poNum = values[9][23];
-              const customerSheet = spreadsheet.getSheetByName('Customer List');
-              var custName = customerSheet.getSheetValues(2, 1, customerSheet.getLastRow() - 1, 2).find(custNumber => custNumber[0] === custNum)
-              custName = (custName != undefined) ? custName[1] : '';
-              const items = values.filter(val => isNotBlank(val[16])) // Use the unit of measure column to remove unnecessary rows
-              items.pop()
-              items.pop()
-              items.pop()
-              const exportValues = items.map(item => ['D', item[3], item[18], (-1*Number(item[0])).toString(), item[16], item[5]]);
-              sheets[0].getRange(1, 2).setValue('')
-                .offset(0,  4).setValue(custNum)
-                .offset(1, -4).setValue('\'' + custName)
-                .offset(0,  6).setValue(poNum)
-                .offset(3, -5, sheets[0].getMaxRows() - 4, 7).clearContent()
-                .offset(0, 0, exportValues.length, 6).setNumberFormat('@').setValues(exportValues).activate();
-              spreadsheet.deleteSheet(sheets[sheet]);
-              spreadsheet.toast('Counter Sales Credit Note was successfully imported.', 'Import Complete.')
-            }
+            else if (false) // Assume it's a credit note from counter sales
+              processImportedCreditNote(info[numRows], info[numCols], sheets[sheet], sheets[0], spreadsheet)
+            else
+              processImportedInvoice(info[numRows], info[numCols], sheets[sheet], sheets[0], spreadsheet)
           }
           
           break;
@@ -628,6 +652,37 @@ function processImportedData(e)
     if (file2.hasNext())
       file2.next().setTrashed(true)
   }
+}
+
+/**
+ * This function checks processes the recently created tab and converts the information into a new order that can be imported into Adagio. It is assumed to be a countersale invocie in this case.
+ * 
+ * @param {Number} numRows : The number of rows from the imported excel file.
+ * @param {Number} numCols : The number of columns from the imported excel file.
+ * @param {Sheet} newSheet : The new sheet that that was just created on import that contains the data from the excel file.
+ * @param {Sheet} itemSearchSheet : The item search search which is used to create new orders.
+ * @param {Spreadsheet} spreadsheet : The active spreadsheet.
+ * @author Jarren Ralf  
+ */
+function processImportedInvoice(numRows, numCols, newSheet, itemSearchSheet, spreadsheet)
+{
+  const values = newSheet.getSheetValues(1, 1, numRows, numCols)
+  const custNum = values[1][23];
+  const poNum = values[8][22].split('PO #: ').pop();
+  const customerSheet = spreadsheet.getSheetByName('Customer List');
+  var custName = customerSheet.getSheetValues(2, 1, customerSheet.getLastRow() - 1, 2).find(custNumber => custNumber[0] === custNum)
+  custName = (custName != undefined) ? custName[1] : '';
+  const items = values.filter((val, idx) => isNotBlank(val[15]) && (idx - 10)%38 > 0 && (idx - 10)%38 < 24) // Use the unit of measure column to remove unnecessary rows
+  const exportValues = items.map(item => ['D', item[3], item[20], item[0].toString(), item[15], item[5]]);
+
+  itemSearchSheet.getRange(1, 2).setValue('')
+    .offset(0,  4).setValue(custNum)
+    .offset(1, -4).setValue('\'' + custName)   
+    .offset(0,  6).setValue(poNum)
+    .offset(3, -5, itemSearchSheet.getMaxRows() - 4, 7).clearContent()
+    .offset(0, 0, exportValues.length, 6).setNumberFormat('@').setValues(exportValues).activate();
+  spreadsheet.deleteSheet(newSheet);
+  spreadsheet.toast('Counter Sales Invoice was successfully imported.', 'Import Complete.')
 }
 
 /**
