@@ -466,7 +466,7 @@ function isUPC_A(upcNumber)
   for (var i = 0, sum = 0, upc = upcNumber.toString(); i < upc.length - 1; i++)
     sum += (i % 2 === 0) ? Number(upc[i])*3 : Number(upc[i])
 
-  return upc.endsWith(Math.ceil(sum/10)*10 - sum)
+  return upc.endsWith(Math.ceil(sum/10)*10 - sum) && upc.length === 12;
 }
 
 /**
@@ -481,7 +481,7 @@ function isEAN_13(upcNumber)
   for (var i = 0, sum = 0, upc = upcNumber.toString(); i < upc.length - 1; i++)
     sum += (i % 2 === 0) ? Number(upc[i]) : Number(upc[i])*3
 
-  return upc.endsWith(Math.ceil(sum/10)*10 - sum)
+  return upc.endsWith(Math.ceil(sum/10)*10 - sum) && upc.length === 13;
 }
 
 /**
@@ -565,26 +565,21 @@ function priceSelection(range, sheet, spreadsheet)
  */
 function processImportedCreditNote(numRows, numCols, newSheet, itemSearchSheet, spreadsheet)
 {
-  const values = newSheet.getSheetValues(1, 1, numRows, numCols)
+  const values = newSheet.getSheetValues(1, 1, numRows, numCols);
   const custNum = values[2][24];
   const poNum = values[9][23];
-
-  Logger.log('custNum: ' + custNum)
-  Logger.log('poNum: ' + poNum)
   const customerSheet = spreadsheet.getSheetByName('Customer List');
-  var custName = customerSheet.getSheetValues(2, 1, customerSheet.getLastRow() - 1, 2).find(custNumber => custNumber[0] === custNum)
-  Logger.log('custName: ' + custName)
+  var custName = customerSheet.getSheetValues(2, 1, customerSheet.getLastRow() - 1, 2).find(custNumber => custNumber[0] === custNum);
   custName = (custName != undefined) ? custName[1] : '';
-  const items = values.filter(val => isNotBlank(val[16])) // Use the unit of measure column to remove unnecessary rows
-  items.pop()
-  items.pop()
-  items.pop()
-  Logger.log('items: ' + items)
+  const items = values.filter((val, idx) => isNotBlank(val[16]) && (idx - 11)%40 > 0 && (idx - 11)%40 < 24); // Use the unit of measure column to remove unnecessary rows
+  items.pop();
+  items.pop();
+  items.pop();
   const exportValues = items.map(item => ['D', item[3], item[18], (-1*Number(item[0])).toString(), item[16], item[5]]);
-  Logger.log('exportValues: ' + exportValues)
+
   itemSearchSheet.getRange(1, 2).setValue('')
     .offset(0,  4).setValue(custNum)
-    .offset(1, -4).setValue('\'' + custName)   
+    .offset(1, -4).setDataValidation(itemSearchSheet.getRange(2, 2).getDataValidation().copy().requireValueInRange(customerSheet.getRange('$B$2:$B')).build()).setValue('\'' + custName)   
     .offset(0,  6).setValue(poNum)
     .offset(3, -5, itemSearchSheet.getMaxRows() - 4, 7).clearContent()
     .offset(0, 0, exportValues.length, 6).setNumberFormat('@').setValues(exportValues).activate();
@@ -604,7 +599,7 @@ function processImportedData(e)
   {
     var spreadsheet = e.source;
     var sheets = spreadsheet.getSheets();
-    var info, numRows = 0, numCols = 1, maxRow = 2, maxCol = 3, isCustomerData = 4, fileName;
+    var info, numRows = 0, numCols = 1, maxRow = 2, maxCol = 3, isCustomerData = 4, isCounterSalesInvoice = 5, isCounterSalesCreditNote = 6, fileName;
 
     for (var sheet = sheets.length - 1; sheet >= 0; sheet--) // Loop through all of the sheets in this spreadsheet and find the new one
     {
@@ -615,7 +610,9 @@ function processImportedData(e)
           sheets[sheet].getLastColumn(),
           sheets[sheet].getMaxRows(),
           sheets[sheet].getMaxColumns(),
-          (sheets[sheet].getLastColumn() != 0) ? sheets[sheet].getSheetValues(1, 1, 1, sheets[sheet].getLastColumn())[0].includes('Telephone') : false // A characteristic of the customer data
+          (sheets[sheet].getLastColumn() != 0) ? sheets[sheet].getSheetValues(1,  1, 1, sheets[sheet].getLastColumn())[0].includes('Telephone') : false, // A characteristic of the customer data
+          (sheets[sheet].getMaxColumns() > 23) ? sheets[sheet].getSheetValues(1,  1, 1, sheets[sheet].getLastColumn())[0].includes('Invoice') : false, // A way of distinguishing countersales invoices
+          (sheets[sheet].getMaxColumns() > 23) ? sheets[sheet].getSheetValues(1,  1, 1, sheets[sheet].getLastColumn())[0].includes('Credit') : false // A way of distinguishing countersales credit notes 
         ]
 
         fileName = sheets[sheet].getSheetName()
@@ -623,6 +620,7 @@ function processImportedData(e)
         // A new sheet is imported by File -> Import -> Insert new sheet(s) - The left disjunct is for a csv and the right disjunct is for an excel file
         if ((info[maxRow] - info[numRows] === 2 && info[maxCol] - info[numCols] === 2) || 
             (info[maxRow] === 1000 && info[maxCol] === 26 && info[numRows] !== 0 && info[numCols] !== 0) ||
+            (info[maxRow] === 1000 && info[maxCol] === info[numCols] && info[numRows] !== 0) ||
             info[isCustomerData]) 
         {
           spreadsheet.toast('Processing imported data...', '', 60)
@@ -631,9 +629,9 @@ function processImportedData(e)
           {
             if (info[isCustomerData])
               updateCustomerList(info[numRows], info[numCols], sheets[sheet], sheets, spreadsheet);
-            else if (false) // Assume it's a credit note from counter sales
+            else if (info[isCounterSalesCreditNote]) // Assume it's a credit note from counter sales
               processImportedCreditNote(info[numRows], info[numCols], sheets[sheet], sheets[0], spreadsheet)
-            else
+            else if (info[isCounterSalesInvoice])
               processImportedInvoice(info[numRows], info[numCols], sheets[sheet], sheets[0], spreadsheet)
           }
           
@@ -677,7 +675,7 @@ function processImportedInvoice(numRows, numCols, newSheet, itemSearchSheet, spr
 
   itemSearchSheet.getRange(1, 2).setValue('')
     .offset(0,  4).setValue(custNum)
-    .offset(1, -4).setValue('\'' + custName)   
+    .offset(1, -4).setDataValidation(itemSearchSheet.getRange(2, 2).getDataValidation().copy().requireValueInRange(customerSheet.getRange('$B$2:$B')).build()).setValue('\'' + custName)
     .offset(0,  6).setValue(poNum)
     .offset(3, -5, itemSearchSheet.getMaxRows() - 4, 7).clearContent()
     .offset(0, 0, exportValues.length, 6).setNumberFormat('@').setValues(exportValues).activate();
