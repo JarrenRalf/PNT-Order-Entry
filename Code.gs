@@ -1264,8 +1264,8 @@ function updateItems()
   itemList.shift();
   sortedItems.shift();
   const numItems = itemList.length;
-  spreadsheet.getSheetByName('Item List').getRange(1, 1, numItems).setValues(itemList);
-  spreadsheet.getSheetByName('Recently Created').getRange(1, 1, numItems).setValues(sortedItems);
+  spreadsheet.getSheetByName('Item List').clearContents().getRange(1, 1, numItems).setValues(itemList);
+  spreadsheet.getSheetByName('Recently Created').clearContents().getRange(1, 1, numItems).setValues(sortedItems);
 }
 
 /**
