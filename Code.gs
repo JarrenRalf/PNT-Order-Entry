@@ -148,12 +148,11 @@ function addSelectedItemsToOrder()
       splitDescription.pop();
       splitDescription.pop();
       return ['D', sku, 0, '', 0, uom, splitDescription.join(' - ')]
-    })).offset(0, 3, 1, 1).activate(); // Move to the quantity column
+    })).offset(0, 3, 1, 1).activate() // Move to the quantity column
+    .offset(1 - row, 2, 1, 1).setValue((new Date().getTime() - startTime)/1000 + " seconds");
   }
   else
     SpreadsheetApp.getUi().alert('Please select an item from the list.');
-
-  sheet.getRange(1, 8).setValue((new Date().getTime() - startTime)/1000 + " seconds");
 }
 
 /**
@@ -169,7 +168,7 @@ function allItems()
   const recentlyCreatedSheet = spreadsheet.getSheetByName('Recently Created');
   const numItems = recentlyCreatedSheet.getLastRow();
   sheet.getRange(1, 1).clearContent() // Clear the search box
-    .offset(4, 0, sheet.getMaxRows() - 4).clearContent() // Clear the previous search
+    .offset(4, 0, sheet.getMaxRows() - 4).clearContent().setWrap(true) // Clear the previous search
     .offset(0, 0, numItems).setValues(recentlyCreatedSheet.getSheetValues(1, 1, numItems, 1)) // Set the values
     .offset(-3, 9, 1, 1).setValue("Items displayed in order of newest to oldest.") // Tell user items are sorted from newest to oldest
     .offset(-1, -2).setValue((new Date().getTime() - startTime)/1000 + " seconds"); // Function runtime
@@ -854,15 +853,17 @@ function search(e, spreadsheet, sheet, isMultipleItemSearch)
 
         if (numItems === 0) // No items were found
           sheet.getRange('A1').activate() // Move the user back to the seachbox
-            .offset( 4, 0, sheet.getMaxRows() - 4).clearContent().setBackground('#cccccc') // Clear content
-            .offset(-3, 9, 1, 1).setValue("No results found.\nPlease try again.");
+            .offset( 4,  0, sheet.getMaxRows() - 4).clearContent().setBackground('#cccccc').setWrap(true) // Clear content
+            .offset(-3,  9, 1, 1).setValue("No results found.\nPlease try again.")
+            .offset(-1, -2).setValue((new Date().getTime() - startTime)/1000 + " seconds")
         else
           sheet.getRange('A5') // Move the user to the top of the search items
-            .offset( 0, 0, sheet.getMaxRows() - 4).clearContent().setBackground('#cccccc').setFontColor('#434343').setFontSize(10).setVerticalAlignment('middle').setHorizontalAlignment('left')
+            .offset( 0, 0, sheet.getMaxRows() - 4).clearContent().setBackground('#cccccc').setFontColor('#434343').setFontSize(10).setVerticalAlignment('middle').setHorizontalAlignment('left').setWrap(true)
               .setBorder(false, false, false, true, false, false, '#1155cc',SpreadsheetApp.BorderStyle.SOLID_THICK)
-            .offset( 0, 0, numItems).setValues(items).setBackgrounds(colours).setFontFamily('Arial').setFontWeight('bold')
-            .offset(-3, 9, 1, 1).setValue((numItems !== 1) ? numItems + " results found." : numItems + " result found.")
-            .offset((numSkusFound != 0) ? numSkusNotFound + 3 : 3, -9, (numSkusFound != 0) ? numSkusFound : numSkusNotFound, 1).activate();
+            .offset( 0,  0, numItems).setValues(items).setBackgrounds(colours).setFontFamily('Arial').setFontWeight('bold')
+            .offset(-3,  9, 1, 1).setValue((numItems !== 1) ? numItems + " results found." : numItems + " result found.")
+            .office(-1, -2).setValue((new Date().getTime() - startTime)/1000 + " seconds")
+            .offset((numSkusFound != 0) ? numSkusNotFound + 4 : 4, -7, (numSkusFound != 0) ? numSkusFound : numSkusNotFound, 1).activate();
       }
       else // All SKUs were succefully found
       {
@@ -870,14 +871,16 @@ function search(e, spreadsheet, sheet, isMultipleItemSearch)
 
         if (numItems === 0) // No items were found
           sheet.getRange('A1').activate() // Move the user back to the seachbox
-            .offset( 4, 0, sheet.getMaxRows() - 4).clearContent().setBackground('#cccccc') // Clear content
-            .offset(-3, 9, 1, 1).setValue("No results found.\nPlease try again.");
+            .offset( 4, 0, sheet.getMaxRows() - 4).clearContent().setBackground('#cccccc').setWrap(true) // Clear content
+            .offset(-3, 9, 1, 1).setValue("No results found.\nPlease try again.")
+            .offset(-1, -2).setValue((new Date().getTime() - startTime)/1000 + " seconds")
         else
           sheet.getRange('A5') // Move the user to the top of the search items
-            .offset( 0, 0, sheet.getMaxRows() - 4).clearContent().setBackground('#cccccc').setFontColor('#434343').setFontSize(10).setVerticalAlignment('middle').setHorizontalAlignment('left')
+            .offset( 0, 0, sheet.getMaxRows() - 4).clearContent().setBackground('#cccccc').setFontColor('#434343').setFontSize(10).setVerticalAlignment('middle').setHorizontalAlignment('left').setWrap(true)
               .setBorder(false, false, false, true, false, false, '#1155cc',SpreadsheetApp.BorderStyle.SOLID_THICK)
             .offset( 0, 0, numItems).setValues(skus).activate() 
-            .offset(-3, 9, 1, 1).setValue((numItems !== 1) ? numItems + " results found." : numItems + " result found.");
+            .offset(-3, 9, 1, 1).setValue((numItems !== 1) ? numItems + " results found." : numItems + " result found.")
+            .offset(-1, -2).setValue((new Date().getTime() - startTime)/1000 + " seconds")
       }
     }
     spreadsheet.toast('Searching Complete.');
@@ -1016,18 +1019,21 @@ function search(e, spreadsheet, sheet, isMultipleItemSearch)
 
       if (numItems === 0) // No items were found
         sheet.getRange('A1').activate() // Move the user back to the seachbox
-          .offset( 4, 0, sheet.getMaxRows() - 4).clearContent().setBackground('#cccccc') // Clear content
-          .offset(-3, 9, 1, 1).setValue("No results found.\nPlease try again.");
+          .offset( 4, 0, sheet.getMaxRows() - 4).clearContent().setBackground('#cccccc').setWrap(true) // Clear content
+          .offset(-3, 9, 1, 1).setValue("No results found.\nPlease try again.")
+          .offset(-1, -2).setValue((new Date().getTime() - startTime)/1000 + " seconds")
       else if (isBarcodeScanned)
-        sheet.getRange(5, 1, sheet.getMaxRows() - 4).clearContent().setBackground('#cccccc')
+        sheet.getRange(5, 1, sheet.getMaxRows() - 4).clearContent().setBackground('#cccccc').setWrap(true)
           .offset(-3, 9, 1, 1).setValue("Barcode found.")
-          .offset(newItemRow - 2, -7, 1, 7).setValues(output) 
-          .offset(0, 3, 1, 1).activate();
+          .offset(-1, -2).setValue((new Date().getTime() - startTime)/1000 + " seconds")
+          .offset(newItemRow - 1, -5, 1, 7).setValues(output) 
+          .offset(0, 3, 1, 1).activate()
       else
         sheet.getRange('A5').activate() // Move the user to the top of the search items
-          .offset( 0, 0, sheet.getMaxRows() - 4).clearContent().setBackground('#cccccc')
+          .offset( 0, 0, sheet.getMaxRows() - 4).clearContent().setBackground('#cccccc').setWrap(true)
           .offset( 0, 0, numItems).setValues(output) 
-          .offset(-3, 9, 1, 1).setValue((numItems !== 1) ? numItems + " results found." : numItems + " result found.");
+          .offset(-3, 9, 1, 1).setValue((numItems !== 1) ? numItems + " results found." : numItems + " result found.")
+          .offset(-1, -2).setValue((new Date().getTime() - startTime)/1000 + " seconds")
 
       spreadsheet.toast('Searching Complete.');
     }
@@ -1037,20 +1043,20 @@ function search(e, spreadsheet, sheet, isMultipleItemSearch)
       const recentlyCreatedItemsSheet = spreadsheet.getSheetByName('Recently Created');
       const numItems = recentlyCreatedItemsSheet.getLastRow();
       sheet.getRange('A5').activate() // Move the user to the top of the search items
-        .offset( 0, 0, sheet.getMaxRows() - 4).clearContent().setBackground('#cccccc')
+        .offset( 0, 0, sheet.getMaxRows() - 4).clearContent().setBackground('#cccccc').setWrap(true)
         .offset( 0, 0, numItems).setValues(recentlyCreatedItemsSheet.getSheetValues(1, 1, numItems, 1))
         .offset(-3, 9, 1, 1).setValue("Items displayed in order of newest to oldest.")
+        .offset(-1, -2).setValue((new Date().getTime() - startTime)/1000 + " seconds")
       spreadsheet.toast('PNT\'s most recently created items are being displayed.')
     }
     else
     {
-      sheet.getRange(5, 1, sheet.getMaxRows() - 4).clearContent().setBackground('#cccccc') // Clear content 
-        .offset(-3, 9, 1, 1).setValue("Invalid search.\nPlease try again.");
+      sheet.getRange(5, 1, sheet.getMaxRows() - 4).clearContent().setBackground('#cccccc').setWrap(true) // Clear content 
+        .offset(-3, 9, 1, 1).setValue("Invalid search.\nPlease try again.")
+        .offset(-1, -2).setValue((new Date().getTime() - startTime)/1000 + " seconds")
       spreadsheet.toast('Invalid Search.');
     }
   }
-
-  sheet.getRange(1, 8).setValue((new Date().getTime() - startTime)/1000 + " seconds");
 }
 
 /**
@@ -1092,11 +1098,13 @@ function search_Customer(spreadsheet, sheet)
         sheet.getRange(2, 2).setDataValidation(sheet.getRange(2, 2).getDataValidation().copy().requireValueInRange(customerSheet.getRange('$B$2:$B')).build()).setValue(customer[1])
           .offset(-1,  4).setValue(customer[0])
           .offset( 1,  4).setValue("1 customer found.")
-          .offset(-1, -9).activate();
+          .offset(-1, -9).activate()
+          .offset( 0,  7).setValue((new Date().getTime() - startTime)/1000 + " seconds");
       else // No customers were found
         sheet.getRange(2, 2).setDataValidation(sheet.getRange(2, 2).getDataValidation().copy().requireValueInRange(customerSheet.getRange('$B$2:$B')).build())
-          .offset( 0, 8).setValue("No customers found.\nPlease try again.")
-          .offset(-1, 0).activate() // Move the user back to the seachbox
+          .offset( 0,  8).setValue("No customers found.\nPlease try again.")
+          .offset(-1,  0).activate() // Move the user back to the seachbox
+          .offset( 0, -2).setValue((new Date().getTime() - startTime)/1000 + " seconds");
         
       spreadsheet.toast('Customer Searching Complete.');
     }
@@ -1175,18 +1183,22 @@ function search_Customer(spreadsheet, sheet)
 
       if (numItems === 0) // No items were found
         sheet.getRange(2, 2).setValue('').setDataValidation(sheet.getRange(2, 2).getDataValidation().copy().requireValueInRange(customerSheet.getRange('$B$2:$B')).build())
-          .offset(-1, 4).setValue('')
-          .offset( 1, 4).setValue("No customers found.\nPlease try again.")
-          .offset(-1, 0).activate() // Move the user back to the seachbox
+          .offset(-1,  4).setValue('')
+          .offset( 1,  4).setValue("No customers found.\nPlease try again.")
+          .offset(-1,  0).activate() // Move the user back to the seachbox
+          .offset( 0, -2).setValue((new Date().getTime() - startTime)/1000 + " seconds");
       else if (numItems !== 1) // More than 1 customer was found
         sheet.getRange(2, 2).setValue('').setDataValidation(sheet.getRange(2, 2).getDataValidation().copy().requireValueInList(customers).build()).activate() // Move the user to customer data validation
-          .offset(-1, 4).setValue('')
-          .offset( 1, 4).setValue(numItems + " customers found.");
+          .offset(-1,  4).setValue('')
+          .offset( 1,  4).setValue(numItems + " customers found.")
+          .offset( 0, -8).activate()
+          .offset(-1,  6).setValue((new Date().getTime() - startTime)/1000 + " seconds");
       else // Only 1 customer was found
         sheet.getRange(2, 2).setDataValidation(sheet.getRange(2, 2).getDataValidation().copy().requireValueInRange(customerSheet.getRange('$B$2:$B')).build()).setValue(customers[0])
           .offset(-1,  4).setValue(customerSheet.getSheetValues(2, 1, customerSheet.getLastRow() - 1, 2).find(customer => customer[1] === customers[0])[0])
           .offset( 1,  4).setValue("1 customer found.")
-          .offset(-1, -9).activate();
+          .offset(-1, -9).activate()
+          .offset( 0,  7).setValue((new Date().getTime() - startTime)/1000 + " seconds");
         
       spreadsheet.toast('Customer Searching Complete.');
     }
@@ -1198,8 +1210,6 @@ function search_Customer(spreadsheet, sheet)
       .offset( 1, 4).setValue("All customers displayed alphabetically.");
     spreadsheet.toast('All customers displayed in Data Validation alphabetically.');
   }
-
-  sheet.getRange(1, 8).setValue((new Date().getTime() - startTime)/1000 + " seconds");
 }
 
 /**
