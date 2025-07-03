@@ -15,7 +15,7 @@ function installedOnEdit(e)
   const spreadsheet = e.source;
   const sheet = spreadsheet.getActiveSheet();
 
-  if (isSingleColumn && sheet.getSheetName() === 'Item Search')
+  if (isSingleColumn && (sheet.getSheetName() === 'Item Search' || sheet.getSheetName() === 'Item Search 2'))
   {
     if (row == 1)
     {
@@ -61,7 +61,8 @@ function onChange(e)
  */
 function onOpen()
 {
-  SpreadsheetApp.getUi().createMenu('Export')
+  const ui = SpreadsheetApp.getUi();
+  ui.createMenu('Export')
     .addItem('Add PNT Delivery Charge ($25)',  'addFreight_PntDelivery')
     .addItem('Add LMFF Shipping Charge', 'addFreight_LMFF')
     .addSeparator()
@@ -69,6 +70,8 @@ function onOpen()
     .addItem('Complete (Fully shipped | No BOs)', 'completeOrder_FullyShipped')
     .addSeparator()
     .addItem('Clear Export Page', 'clearExport').addToUi();
+  ui.createMenu('Update')
+    .addItem('Update Items', 'updateItems').addToUi();
 }
 
 /**
@@ -213,11 +216,12 @@ function completeOrder(isFullyShipped)
   try
   {
     const searchSheet = SpreadsheetApp.getActiveSheet();
+    const sheetName = searchSheet.getSheetName();
 
-    if (searchSheet.getSheetName() !== 'Item Search')
+    if (sheetName !== 'Item Search' && sheetName !== 'Item Search 2')
     {
-      spreadsheet.getSheetByName('Item Search').activate();
-      Browser.msgBox('Please return to the Dashboard to run this function.')
+      SpreadsheetApp.getActive().getSheetByName('Item Search').activate();
+      Browser.msgBox('Please return to the Item Search page to run this function.')
     }
     else
     {
