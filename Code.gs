@@ -328,8 +328,10 @@ function completeOrder(isFullyShipped)
       })
 
       orderRange.offset(1, 0, numRows - 1, numCols).clearContent() // Customer Order
-        .offset(-1,  3, 1, 3)
-          .setValues([['PNT DELIVERY', '', '']])  // PNT Delivery, Invoice Discount Percentage, and Comment 1
+        .offset(0, -1, numRows - 1, 1)
+          .setBackground('#4a86e8')              // Valid Discount Indicator Background Colour reset
+        .offset(-1,  4, 1, 3)
+          .setValues([['PNT DELIVERY', '', '']]) // PNT Delivery, Invoice Discount Percentage, and Comment 1
         .offset(-3, -4, 1, 1).setValue('')       // Pricing Selection
         .offset( 1,  0).setValue('')             // Customer Name
         .offset( 0,  7).setValue('')             // PO Number
@@ -603,27 +605,45 @@ function priceSelection(range, sheet, spreadsheet)
 
     const maxRows = sheet.getMaxRows();
     const numRows = getLastRowSpecial(sheet.getSheetValues(5, 4, maxRows, 1));
+    const validDiscountIndicatorColours = [];
 
     if (numRows > 0)
     {
-      const itemRange = sheet.getRange(5, 4, getLastRowSpecial(sheet.getSheetValues(5, 4, maxRows, 1)), 2);
+      const itemRange = sheet.getRange(5, 4, numRows, 2);
 
       const order = itemRange.getValues().map(item => {
+
         if (item[0] !== 'FREIGHT')
         {
           itemPricing = discounts.find(sku => sku[0].split(' - ').pop().toString().toUpperCase() === item[0]); // Find the item pricing on the discount sheet
 
           if (itemPricing != undefined && itemPricing[BASE_PRICE] != 0) // SKU is assumed to be valid
-            item[1] = (price !== 1) ? (itemPricing[BASE_PRICE]*(100 - itemPricing[price])/100).toFixed(2) : itemPricing[price];
+          {
+            if (itemPricing[price] != '0')
+            {
+              item[1] = (price !== 1) ? (itemPricing[BASE_PRICE]*(100 - itemPricing[price])/100).toFixed(2) : itemPricing[price];
+              validDiscountIndicatorColours.push(['#4a86e8']);
+            }
+            else
+            {
+              item[1] = (price !== 1) ? itemPricing[BASE_PRICE] : itemPricing[price];
+              validDiscountIndicatorColours.push(['red']);
+            }
+          }
+          else
+            validDiscountIndicatorColours.push(['#4a86e8']);
         }
         else
+        {
           item[1] = '25.00';
-
+          validDiscountIndicatorColours.push(['#4a86e8']);
+        }
+          
         return item
         
       }) 
 
-      itemRange.setValues(order);
+      itemRange.setValues(order).offset(0, -2, numRows, 1).setBackgrounds(validDiscountIndicatorColours);
       spreadsheet.toast('Price change complete.')
     }
     else
