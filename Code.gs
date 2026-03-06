@@ -620,8 +620,10 @@ function priceSelection(range, sheet, spreadsheet)
           if (itemPricing != undefined && itemPricing[BASE_PRICE] != 0) // SKU is assumed to be valid
           {
             if (itemPricing[price] != '0')
-            {
-              item[1] = (price !== 1) ? (itemPricing[BASE_PRICE]*(100 - itemPricing[price])/100).toFixed(2) : itemPricing[price];
+            { 
+              // If the wholesale pricing is selected, but the lodge pricing is better, give the customer the lodge pricing
+              item[1] = (price !== 1) ? (price === 4 && itemPricing[price] < itemPricing[3]) ? (itemPricing[BASE_PRICE]*(100 - itemPricing[    3])/100).toFixed(2) : 
+                                                                                               (itemPricing[BASE_PRICE]*(100 - itemPricing[price])/100).toFixed(2) : itemPricing[price];
               validDiscountIndicatorColours.push(['#4a86e8']);
             }
             else
@@ -886,7 +888,7 @@ function search(e, spreadsheet, sheet, isMultipleItemSearch)
               .setBorder(false, false, false, true, false, false, '#1155cc',SpreadsheetApp.BorderStyle.SOLID_THICK)
             .offset( 0,  0, numItems).setValues(items).setBackgrounds(colours).setFontFamily('Arial').setFontWeight('bold')
             .offset(-3,  9, 1, 1).setValue((numItems !== 1) ? numItems + " results found." : numItems + " result found.")
-            .office(-1, -2).setValue((new Date().getTime() - startTime)/1000 + " seconds")
+            .offset(-1, -2).setValue((new Date().getTime() - startTime)/1000 + " seconds")
             .offset((numSkusFound != 0) ? numSkusNotFound + 4 : 4, -7, (numSkusFound != 0) ? numSkusFound : numSkusNotFound, 1).activate();
       }
       else // All SKUs were succefully found
