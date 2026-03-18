@@ -66,6 +66,9 @@ function onOpen()
     .addItem('Add PNT Delivery Charge ($25)',  'addFreight_PntDelivery')
     .addItem('Add LMFF Shipping Charge', 'addFreight_LMFF')
     .addSeparator()
+    .addItem('Insert Instructions (Top)', 'insertInstructionLine_Top')
+    .addItem('Insert Instructions (Bottom)', 'insertInstructionLine_Bottom')
+    .addSeparator()
     .addItem('Complete', 'completeOrder')
     .addItem('Complete (Fully shipped | No BOs)', 'completeOrder_FullyShipped')
     .addSeparator()
@@ -87,8 +90,7 @@ function addFreight(isPntDelivery)
   const today = Utilities.formatDate(new Date(), SpreadsheetApp.getActive(), 'dd MMM')
   const lastRow = Math.max(getLastRowSpecial(sheet.getSheetValues(1,  3, maxRows, 1)),
                            getLastRowSpecial(sheet.getSheetValues(1,  4, maxRows, 1)), 
-                           getLastRowSpecial(sheet.getSheetValues(1,  9, maxRows, 1)), 
-                           getLastRowSpecial(sheet.getSheetValues(1, 10, maxRows, 1))) - 3;
+                           getLastRowSpecial(sheet.getSheetValues(1,  9, maxRows, 1))) - 3;
 
   sheet.getRange(4, 6).setValue((isPntDelivery) ? 'PNT DELIVERY' : 'LOWER MAINLAND F.F.')
     .offset(lastRow, -3, 1, 7).setValues((isPntDelivery) ? 
@@ -141,8 +143,9 @@ function addSelectedItemsToOrder()
     const numItems = itemValues.length;
     const maxRow = sheet.getMaxRows();
     const row = (isNotBlank(sheet.getSheetValues(5, 4, 1, 1)[0][0])) ? 
-      Math.max(getLastRowSpecial(sheet.getSheetValues(1, 4, maxRow, 1)), // SKU column
-               getLastRowSpecial(sheet.getSheetValues(1, 8, maxRow, 1))) // Description column
+      Math.max(getLastRowSpecial(sheet.getSheetValues(1, 3, maxRow, 1)), // Indicator column
+               getLastRowSpecial(sheet.getSheetValues(1, 4, maxRow, 1)), // SKU column
+               getLastRowSpecial(sheet.getSheetValues(1, 9, maxRow, 1))) // Description column
       + 1: 5;
     sheet.getRange(row, 3, numItems, 7).setNumberFormat('@').setValues(itemValues.map(item => {
       splitDescription = item[0].split(' - ');
@@ -227,7 +230,8 @@ function completeOrder(isFullyShipped)
     {
       var exportData_WithDiscountedPrices = [];
       const maxRow = searchSheet.getMaxRows() - 3;
-      const numRows = Math.max(getLastRowSpecial(searchSheet.getSheetValues(4,  4, maxRow, 1)), 
+      const numRows = Math.max(getLastRowSpecial(searchSheet.getSheetValues(4,  3, maxRow, 1)), 
+                               getLastRowSpecial(searchSheet.getSheetValues(4,  4, maxRow, 1)), 
                                getLastRowSpecial(searchSheet.getSheetValues(4,  9, maxRow, 1)), 
                                getLastRowSpecial(searchSheet.getSheetValues(4, 10, maxRow, 1)));
       const numCols = 8;
@@ -238,7 +242,7 @@ function completeOrder(isFullyShipped)
         if (item[0] === 'H')
           exportData_WithDiscountedPrices.push(['H', item[1], item[2], item[3], item[4], item[5]])
         else if (item[0] === 'I')
-          exportData_WithDiscountedPrices.push(['I', item[1], '', '', '', ''])
+          exportData_WithDiscountedPrices.push(['I', item[6].toString().substring(0, 75), '', '', '', ''])
         else if (item[0] === 'D')
         {
           item[1] = item[1].toString().trim().toUpperCase(); // Make the SKU uppercase
@@ -397,30 +401,6 @@ function customerSelection(range, spreadsheet)
 }
 
 /**
- * This function creates the trigger for updating the items daily and for the installed onEdit and Change triggers.
- * 
- * @author Jarren Ralf
- */
-function triggers_CreateAll()
-{
-  const ss = SpreadsheetApp.getActive();
-  ScriptApp.newTrigger('updateItems').timeBased().everyDays(1).atHour(23).create();
-  ScriptApp.newTrigger('updateUPCs').timeBased().everyDays(1).atHour(23).create();
-  ScriptApp.newTrigger('onChange').forSpreadsheet(ss).onChange().create();
-  ScriptApp.newTrigger('installedOnEdit').forSpreadsheet(ss).onEdit().create();
-}
-
-/**
- * This function creates the trigger for updating the items daily and for the installed onEdit and Change triggers.
- * 
- * @author Jarren Ralf
- */
-function triggers_DeleteAll()
-{
-  ScriptApp.getProjectTriggers().map(trigger => ScriptApp.deleteTrigger(trigger));
-}
-
-/**
  * This function handles the task of deleting items from the users order on the Item Search sheet. 
  * It finds the missing descriptions and it moves the data up to fill in the gap.
  * 
@@ -437,7 +417,9 @@ function deleteItemsFromOrder(sheet, range, value, row, isSingleRow, isSingleCol
   const startTime = new Date().getTime(); // Used for the function runtime
   spreadsheet.toast('Checking for possible lines to delete...')
   const maxRow = sheet.getMaxRows();
-  const numRows = Math.max(getLastRowSpecial(sheet.getSheetValues(1, 4, maxRow, 1)), getLastRowSpecial(sheet.getSheetValues(1, 9, maxRow, 1))) - row + 1;
+  const numRows = Math.max(getLastRowSpecial(sheet.getSheetValues(1, 3, maxRow, 1)), 
+                           getLastRowSpecial(sheet.getSheetValues(1, 4, maxRow, 1)), 
+                           getLastRowSpecial(sheet.getSheetValues(1, 9, maxRow, 1))) - row + 1;
 
   if (numRows > 0)
   {
@@ -497,6 +479,40 @@ function getLastRowSpecial(range)
       blank = false;
   }
   return rowNum;
+}
+
+/**
+ * @author Jarren Ralf
+ */
+function insertInstructionLine_Bottom()
+{
+  const searchSheet = SpreadsheetApp.getActive().getSheetByName('Item Search');
+  const maxRow = searchSheet.getMaxRows() - 3;
+  const numRows = Math.max(getLastRowSpecial(searchSheet.getSheetValues(1,  3, maxRow, 1)),
+                           getLastRowSpecial(searchSheet.getSheetValues(1,  4, maxRow, 1)), 
+                           getLastRowSpecial(searchSheet.getSheetValues(1,  9, maxRow, 1)), 
+                           getLastRowSpecial(searchSheet.getSheetValues(1, 10, maxRow, 1))) + 1;
+   
+  searchSheet.getRange(numRows, 3, 1, 7).setValues([['I', '', '', '', '','Instructions:', '']]).offset(0, 6, 1, 1).activate();
+}
+
+/**
+ * @author Jarren Ralf
+ */
+function insertInstructionLine_Top()
+{
+  const searchSheet = SpreadsheetApp.getActive().getSheetByName('Item Search');
+  const maxRow = searchSheet.getMaxRows() - 3;
+  const numCols = 8;
+  const lastRow = Math.max(getLastRowSpecial(searchSheet.getSheetValues(5,  3, maxRow, 1)),
+                           getLastRowSpecial(searchSheet.getSheetValues(5,  4, maxRow, 1)), 
+                           getLastRowSpecial(searchSheet.getSheetValues(5,  9, maxRow, 1)), 
+                           getLastRowSpecial(searchSheet.getSheetValues(5, 10, maxRow, 1)));
+  const orderRange = searchSheet.getRange(5, 3, lastRow, numCols);
+  const orderValues = orderRange.getValues();
+  const numRows = orderValues.unshift(['I', '', '', '', '', 'Instructions:', '', ''])
+
+  orderRange.offset(0, 0, numRows, numCols).setValues(orderValues).offset(0, 6, 1, 1).activate();
 }
 
 /**
@@ -604,7 +620,7 @@ function priceSelection(range, sheet, spreadsheet)
     var itemPricing;
 
     const maxRows = sheet.getMaxRows();
-    const numRows = getLastRowSpecial(sheet.getSheetValues(5, 4, maxRows, 1));
+    const numRows = Math.max(getLastRowSpecial(sheet.getSheetValues(5, 5, maxRows, 1)))
     const validDiscountIndicatorColours = [];
 
     if (numRows > 0)
@@ -960,8 +976,9 @@ function search(e, spreadsheet, sheet, isMultipleItemSearch)
               output.push(['D', sku, 0, '', 0, uom, splitDescription.join(' - ')]);
 
               var newItemRow = (isNotBlank(sheet.getSheetValues(5, 4, 1, 1)[0][0])) ? 
-                  Math.max(getLastRowSpecial(sheet.getSheetValues(1, 4, sheet.getMaxRows(), 1)), // SKU column
-                  getLastRowSpecial(sheet.getSheetValues(1, 9, sheet.getMaxRows(), 1))) // Description column
+                  Math.max(getLastRowSpecial(sheet.getSheetValues(1,  3, sheet.getMaxRows(), 1)), // Indicator column
+                           getLastRowSpecial(sheet.getSheetValues(1,  4, sheet.getMaxRows(), 1)), // SKU column
+                           getLastRowSpecial(sheet.getSheetValues(1,  9, sheet.getMaxRows(), 1))) // Description column
                 + 1 : 5;
                 
               break; // Item was found, therefore stop searching
@@ -1259,6 +1276,30 @@ function sortByCreatedDate(a, b)
 function sortUPCsNumerically(a, b)
 {
   return parseInt(a[0]) - parseInt(b[0]);
+}
+
+/**
+ * This function creates the trigger for updating the items daily and for the installed onEdit and Change triggers.
+ * 
+ * @author Jarren Ralf
+ */
+function triggers_CreateAll()
+{
+  const ss = SpreadsheetApp.getActive();
+  ScriptApp.newTrigger('updateItems').timeBased().everyDays(1).atHour(23).create();
+  ScriptApp.newTrigger('updateUPCs').timeBased().everyDays(1).atHour(23).create();
+  ScriptApp.newTrigger('onChange').forSpreadsheet(ss).onChange().create();
+  ScriptApp.newTrigger('installedOnEdit').forSpreadsheet(ss).onEdit().create();
+}
+
+/**
+ * This function creates the trigger for updating the items daily and for the installed onEdit and Change triggers.
+ * 
+ * @author Jarren Ralf
+ */
+function triggers_DeleteAll()
+{
+  ScriptApp.getProjectTriggers().map(trigger => ScriptApp.deleteTrigger(trigger));
 }
 
 /**
