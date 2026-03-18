@@ -733,7 +733,7 @@ function processImportedData(e)
           sheets[sheet].getMaxRows(),
           sheets[sheet].getMaxColumns(),
           (sheets[sheet].getLastColumn() != 0) ? sheets[sheet].getSheetValues(1,  1, 1, sheets[sheet].getLastColumn())[0].includes('Telephone') : false, // A characteristic of the customer data
-          (sheets[sheet].getMaxColumns() > 23) ? sheets[sheet].getSheetValues(1,  1, 1, sheets[sheet].getLastColumn())[0].includes('Invoice') : false, // A way of distinguishing countersales invoices
+          (sheets[sheet].getMaxColumns() > 23) ? sheets[sheet].getSheetValues(1,  1, 1, sheets[sheet].getLastColumn())[0].includes('Invoice') || sheets[sheet].getSheetValues(1,  1, 1, sheets[sheet].getLastColumn())[0].includes('Quote') : false, // A way of distinguishing countersales invoices
           (sheets[sheet].getMaxColumns() > 23) ? sheets[sheet].getSheetValues(1,  1, 1, sheets[sheet].getLastColumn())[0].includes('Credit') : false // A way of distinguishing countersales credit notes 
         ]
 
