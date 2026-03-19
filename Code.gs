@@ -68,6 +68,8 @@ function onOpen()
     .addSeparator()
     .addItem('Insert Instructions (Top)', 'insertInstructionLine_Top')
     .addItem('Insert Instructions (Bottom)', 'insertInstructionLine_Bottom')
+    .addItem('Insert Comment (Above Selected Row)', 'insertCommentLine_Above')
+    .addItem('Insert Comment (Below Selected Row)', 'insertCommentLine_Below')
     .addSeparator()
     .addItem('Complete', 'completeOrder')
     .addItem('Complete (Fully shipped | No BOs)', 'completeOrder_FullyShipped')
@@ -142,11 +144,12 @@ function addSelectedItemsToOrder()
   { 
     const numItems = itemValues.length;
     const maxRow = sheet.getMaxRows();
-    const row = (isNotBlank(sheet.getSheetValues(5, 4, 1, 1)[0][0])) ? 
+    const row = (isNotBlank(sheet.getSheetValues(5, 3, 1, 1)[0][0])) ? 
       Math.max(getLastRowSpecial(sheet.getSheetValues(1, 3, maxRow, 1)), // Indicator column
                getLastRowSpecial(sheet.getSheetValues(1, 4, maxRow, 1)), // SKU column
                getLastRowSpecial(sheet.getSheetValues(1, 9, maxRow, 1))) // Description column
       + 1: 5;
+
     sheet.getRange(row, 3, numItems, 7).setNumberFormat('@').setValues(itemValues.map(item => {
       splitDescription = item[0].split(' - ');
       sku = splitDescription.pop();
@@ -229,7 +232,7 @@ function completeOrder(isFullyShipped)
     else
     {
       var exportData_WithDiscountedPrices = [];
-      const maxRow = searchSheet.getMaxRows() - 3;
+      const maxRow = searchSheet.getMaxRows();
       const numRows = Math.max(getLastRowSpecial(searchSheet.getSheetValues(4,  3, maxRow, 1)), 
                                getLastRowSpecial(searchSheet.getSheetValues(4,  4, maxRow, 1)), 
                                getLastRowSpecial(searchSheet.getSheetValues(4,  9, maxRow, 1)), 
@@ -482,6 +485,70 @@ function getLastRowSpecial(range)
 }
 
 /**
+ * This function adds a comment line either above or below the selected row, based on the users choice.
+ * 
+ * @param {Boolean} isAbove : The comment line will be above if true, below if false.
+ * @author Jarren Ralf
+ */
+function insertCommentLine(isAbove)
+{
+  const spreadsheet = SpreadsheetApp.getActive();
+  const searchSheet = spreadsheet.getActiveSheet();
+
+  if (searchSheet.getSheetName() !== 'Item Search')
+  {
+    spreadsheet.getSheetByName('Item Search').activate();
+    Browser.msgBox('Select a position to insert a comment line.')
+  }
+  else
+  {
+    const activeRange = spreadsheet.getActiveRange();
+    const row = activeRange.getRow()
+    const maxRow = searchSheet.getMaxRows();
+    const lastRow = Math.max(getLastRowSpecial(searchSheet.getSheetValues(1,  3, maxRow, 1)),
+                             getLastRowSpecial(searchSheet.getSheetValues(1,  4, maxRow, 1)), 
+                             getLastRowSpecial(searchSheet.getSheetValues(1,  9, maxRow, 1)), 
+                             getLastRowSpecial(searchSheet.getSheetValues(1, 10, maxRow, 1))) + 1
+    const numCols = 8;
+
+    if (activeRange.getLastRow() !== row)
+      Browser.msgBox('Select 1 row only.')
+    else if (row == 5 || row == lastRow)
+      searchSheet.getRange(row, 3, 1, numCols).setValues([['C', '', '', '', '', 'Comment:', '', '']]).offset(0, 6, 1, 1).activate();
+    else if (row < 5 || row > lastRow + 1)
+      Browser.msgBox('Select an item on the order')
+    else
+    {
+      const range = (isAbove) ? searchSheet.getRange(row, 3, lastRow - row, numCols) : searchSheet.getRange(row + 1, 3, lastRow - row - 1, numCols);
+      const values = range.getValues();
+      const numRows = values.unshift(['C', '', '', '', '', 'Comment:', '', ''])
+
+      range.offset(0, 0, numRows, numCols).setValues(values).offset(0, 6, 1, 1).activate();
+    }
+  }
+}
+
+/**
+ * This function adds a comment line above the selected row.
+ * 
+ * @author Jarren Ralf
+ */
+function insertCommentLine_Above()
+{
+  insertCommentLine(true);
+}
+
+/**
+ * This function adds a comment line below the selected row.
+ * 
+ * @author Jarren Ralf
+ */
+function insertCommentLine_Below()
+{
+  insertCommentLine(false);
+}
+
+/**
  * This function adds an instruction line at the top of the order.
  * 
  * @author Jarren Ralf
@@ -489,7 +556,7 @@ function getLastRowSpecial(range)
 function insertInstructionLine_Bottom()
 {
   const searchSheet = SpreadsheetApp.getActive().getSheetByName('Item Search');
-  const maxRow = searchSheet.getMaxRows() - 3;
+  const maxRow = searchSheet.getMaxRows();
   const numRows = Math.max(getLastRowSpecial(searchSheet.getSheetValues(1,  3, maxRow, 1)),
                            getLastRowSpecial(searchSheet.getSheetValues(1,  4, maxRow, 1)), 
                            getLastRowSpecial(searchSheet.getSheetValues(1,  9, maxRow, 1)), 
@@ -506,7 +573,7 @@ function insertInstructionLine_Bottom()
 function insertInstructionLine_Top()
 {
   const searchSheet = SpreadsheetApp.getActive().getSheetByName('Item Search');
-  const maxRow = searchSheet.getMaxRows() - 3;
+  const maxRow = searchSheet.getMaxRows() - 4;
   const numCols = 8;
   const lastRow = Math.max(getLastRowSpecial(searchSheet.getSheetValues(5,  3, maxRow, 1)),
                            getLastRowSpecial(searchSheet.getSheetValues(5,  4, maxRow, 1)), 
