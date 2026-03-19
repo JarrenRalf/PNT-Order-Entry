@@ -482,6 +482,8 @@ function getLastRowSpecial(range)
 }
 
 /**
+ * This function adds an instruction line at the top of the order.
+ * 
  * @author Jarren Ralf
  */
 function insertInstructionLine_Bottom()
@@ -497,6 +499,8 @@ function insertInstructionLine_Bottom()
 }
 
 /**
+ * This function adds an instruction line at the bottom of the order.
+ * 
  * @author Jarren Ralf
  */
 function insertInstructionLine_Top()
@@ -508,11 +512,17 @@ function insertInstructionLine_Top()
                            getLastRowSpecial(searchSheet.getSheetValues(5,  4, maxRow, 1)), 
                            getLastRowSpecial(searchSheet.getSheetValues(5,  9, maxRow, 1)), 
                            getLastRowSpecial(searchSheet.getSheetValues(5, 10, maxRow, 1)));
-  const orderRange = searchSheet.getRange(5, 3, lastRow, numCols);
-  const orderValues = orderRange.getValues();
-  const numRows = orderValues.unshift(['I', '', '', '', '', 'Instructions:', '', ''])
+                           
+  if (lastRow > 0)
+  {
+    const orderRange = searchSheet.getRange(5, 3, lastRow, numCols);
+    const orderValues = orderRange.getValues();
+    const numRows = orderValues.unshift(['I', '', '', '', '', 'Instructions:', '', ''])
 
-  orderRange.offset(0, 0, numRows, numCols).setValues(orderValues).offset(0, 6, 1, 1).activate();
+    orderRange.offset(0, 0, numRows, numCols).setValues(orderValues).offset(0, 6, 1, 1).activate();
+  }
+  else
+    searchSheet.getRange(5, 3, 1, numCols).setValues([['I', '', '', '', '', 'Instructions:', '', '']]).offset(0, 6, 1, 1).activate();
 }
 
 /**
