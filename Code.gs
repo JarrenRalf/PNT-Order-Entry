@@ -426,7 +426,7 @@ function deleteItemsFromOrder(sheet, range, value, row, isSingleRow, isSingleCol
 
   if (numRows > 0)
   {
-    const itemsOrderedRange = sheet.getRange(row, 3, numRows, 7);
+    const itemsOrderedRange = sheet.getRange(row, 3, numRows, 8);
     
     if (isSingleRow)
     {
@@ -450,7 +450,7 @@ function deleteItemsFromOrder(sheet, range, value, row, isSingleRow, isSingleCol
       itemsOrderedRange.clearContent();
       
       if (orderedItems.length > 0)
-        itemsOrderedRange.offset(0, 0, orderedItems.length, 7).setValues(orderedItems); // Move the items up to fill in the gaps 
+        itemsOrderedRange.offset(0, 0, orderedItems.length, 8).setValues(orderedItems); // Move the items up to fill in the gaps 
 
       spreadsheet.toast('Deleting Complete.')
     }
