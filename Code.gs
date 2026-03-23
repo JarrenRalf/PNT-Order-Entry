@@ -246,6 +246,13 @@ function completeOrder(isFullyShipped)
           exportData_WithDiscountedPrices.push(['H', item[1], item[2], item[3], item[4], item[5]])
         else if (item[0] === 'I')
           exportData_WithDiscountedPrices.push(['I', item[6].toString().substring(0, 75), '', '', '', ''])
+        else if (item[0] === 'C')
+        {
+          exportData_WithDiscountedPrices.push(...item[6].match(/.{1,75}/g).map(c => ['C', c, '', '', '', '']))
+
+          if (isNotBlank(item[7])) // There are notes for the current line
+            exportData_WithDiscountedPrices.push(...('Notes: ' + item[7]).match(/.{1,75}/g).map(c => ['C', c, '', '', '', '']))
+        }
         else if (item[0] === 'D')
         {
           item[1] = item[1].toString().trim().toUpperCase(); // Make the SKU uppercase
